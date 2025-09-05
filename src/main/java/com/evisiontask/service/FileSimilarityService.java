@@ -3,11 +3,16 @@ package com.evisiontask.service;
 import com.evisiontask.Dto.FileSimilarityAnalyze;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.*;
+
+import static java.util.function.UnaryOperator.identity;
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
 
 @Service
 public class FileSimilarityService {
@@ -87,27 +92,17 @@ public class FileSimilarityService {
         return result;
     }
 
-    private Map<String,Long> buildWordFrequencyMap(File file)  {
-
-        Map<String,Long> mp = new HashMap<>();
-        Scanner scannerA = null;
-        try {
-            scannerA = new Scanner(file);
-            while (scannerA.hasNext()) {
-                String word = scannerA.next();
-                if(isChunkWord(word)) {
-                    mp.put(word,mp.getOrDefault(word,0L)+1);
-                }
-            }
-        }catch (Exception e) {
-            System.out.println(e.getMessage());
-        }finally {
-            if(scannerA != null) {
-                scannerA.close();
-            }
+    private Map<String, Long> buildWordFrequencyMap(File file) {
+        try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            return reader.lines()
+                    .parallel()
+                    .flatMap(line -> Arrays.stream(line.split(" ")))
+                    .filter(word -> !word.isEmpty() && isChunkWord(word))
+                    .collect(groupingBy(identity(), counting()));
+        } catch (IOException e) {
+            System.err.println("Error reading file: " + e.getMessage());
+            return new HashMap<>();
         }
-
-        return mp;
     }
 
     private boolean isChunkWord(String word) {
